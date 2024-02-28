@@ -2,13 +2,16 @@
 //!
 //! This module defines the [`Keys`] structure and its related functions.
 
+use std::str::FromStr;
+
 use bdk::bitcoin::secp256k1::Secp256k1;
 use bdk::bitcoin::Network as BdkNetwork;
 use bdk::keys::bip39::{Language, Mnemonic, WordCount};
 use bdk::keys::{DerivableKey, ExtendedKey, GeneratableKey};
+use bitcoin::bip32::ExtendedPrivKey;
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{derive_account_xprv_from_mnemonic, get_xpub_from_xprv};
+use crate::utils::{derive_account_xprv_from_mnemonic, get_xpub_from_xprv, derive_account_xprv_from_master_xprv};
 use crate::{BitcoinNetwork, Error};
 
 /// A set of Bitcoin keys used by the wallet.
@@ -46,6 +49,24 @@ pub fn generate_keys(bitcoin_network: BitcoinNetwork) -> Keys {
     }
 }
 
+/// Generate a set of [`Keys`] for the given Bitcoin network.
+pub fn generate_keys_from_xpriv(xpriv: &ExtendedPrivKey) -> Keys {
+    let xkey: ExtendedKey = xpriv
+        .clone()
+        .into_extended_key()
+        .expect("a valid key should have been provided");
+    let xpub = &xkey.into_xpub(xpriv.network, &Secp256k1::new());
+    let network = BitcoinNetwork::from_str(&xpriv.network.to_string()).unwrap();
+    let account_xprv = derive_account_xprv_from_master_xprv(network, xpriv).unwrap();
+    let account_xpub = get_xpub_from_xprv(&account_xprv);
+    let account_xpub_fingerprint = account_xpub.fingerprint().to_string();
+    Keys {
+        mnemonic: String::new(),
+        xpub: xpub.clone().to_string(),
+        account_xpub_fingerprint,
+        account_xpub: account_xpub.to_string(),
+    }
+}
 /// Recreate a set of [`Keys`] from the given mnemonic phrase.
 pub fn restore_keys(bitcoin_network: BitcoinNetwork, mnemonic: String) -> Result<Keys, Error> {
     let bdk_network = BdkNetwork::from(bitcoin_network);

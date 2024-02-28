@@ -180,8 +180,20 @@ pub(crate) fn derive_account_xprv_from_mnemonic(
         ChildNumber::from_hardened_idx(ACCOUNT as u32).unwrap(),
     ];
     let mnemonic = Mnemonic::parse_in(Language::English, mnemonic.to_string())?;
-    let master_xprv =
-        ExtendedPrivKey::new_master(bitcoin_network.into(), &mnemonic.to_seed("")).unwrap();
+    let master_xprv = ExtendedPrivKey::new_master(bitcoin_network.into(), &mnemonic.to_seed("")).unwrap();
+    Ok(master_xprv.derive_priv(&Secp256k1::new(), &account_derivation_path)?)
+}
+
+pub(crate) fn derive_account_xprv_from_master_xprv(
+    bitcoin_network: BitcoinNetwork,
+    master_xprv: &ExtendedPrivKey,
+) -> Result<ExtendedPrivKey, Error> {
+    let coin_type = get_coin_type(bitcoin_network);
+    let account_derivation_path = vec![
+        ChildNumber::from_hardened_idx(PURPOSE as u32).unwrap(),
+        ChildNumber::from_hardened_idx(coin_type).unwrap(),
+        ChildNumber::from_hardened_idx(ACCOUNT as u32).unwrap(),
+    ];
     Ok(master_xprv.derive_priv(&Secp256k1::new(), &account_derivation_path)?)
 }
 
